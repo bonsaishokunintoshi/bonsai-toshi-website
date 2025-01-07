@@ -1,2 +1,33 @@
-config.json
-venv/
+# Dependencies
+/node_modules
+/venv
+__pycache__/
+*.py[cod]
+
+# Environment
+.env
+.env.local
+.env.*.local
+.python-version
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Build / Generate
+/dist
+/build
+*.log
+
+# Cache
+.cache/
+.pytest_cache/
+.eslintcache
+
+# Local data
+/data/*.json
+!/data/README.md

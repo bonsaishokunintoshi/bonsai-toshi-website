@@ -2,7 +2,9 @@
 const CONFIG = {
     itemsPerPage: 12,
     loadMoreThreshold: 200,
-    initialLoad: 24  // 初期表示数を増やす
+    initialLoad: 24,
+    maxRetries: 3,  // 最大リトライ回数
+    retryDelay: 1000  // リトライ間隔（ミリ秒）
 };
 
 // 状態管理
@@ -36,7 +38,19 @@ function formatDate(dateString) {
     });
 }
 
+// セキュリティ対策: HTMLエスケープ関数
+function escapeHtml(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 function processDescription(description) {
+    if (!description) return '';
+    
     // 共通の前置きテキストを削除
     const commonPrefixes = [
         "チャンネル登録よろしくお願いします",
@@ -50,7 +64,6 @@ function processDescription(description) {
     commonPrefixes.forEach(prefix => {
         const index = processedDesc.toLowerCase().indexOf(prefix.toLowerCase());
         if (index !== -1) {
-            // 前置き部分とその後の改行までを削除
             const nextLineBreak = processedDesc.indexOf('\n', index);
             if (nextLineBreak !== -1) {
                 processedDesc = processedDesc.substring(0, index) + processedDesc.substring(nextLineBreak + 1);
@@ -58,14 +71,13 @@ function processDescription(description) {
         }
     });
     
-    // 空白行の削除と文字数制限
     processedDesc = processedDesc
         .split('\n')
         .filter(line => line.trim())
         .join('\n')
         .trim();
     
-    return processedDesc.length > 100 ? processedDesc.substring(0, 100) + '...' : processedDesc;
+    return escapeHtml(processedDesc.length > 100 ? processedDesc.substring(0, 100) + '...' : processedDesc);
 }
 
 function getHighQualityThumbnail(thumbnailUrl) {
@@ -86,45 +98,28 @@ function getHighQualityThumbnail(thumbnailUrl) {
 
 // コンテンツ表示関数
 function displayYouTubeVideo(video, container) {
+    if (!video || !container) return;
+
     const videoElement = document.createElement('div');
     videoElement.className = 'video fade-in';
     
     const processedDescription = processDescription(video.description);
     const highQualityThumbnail = getHighQualityThumbnail(video.thumbnail);
-    
-    // 画像読み込みエラー時の処理を改善
-    const handleImageError = (img) => {
-        const videoId = video.thumbnail.match(/vi\/([^\/]+)/)?.[1];
-        if (!videoId) return;
-
-        const qualities = [
-            'maxresdefault.jpg',
-            'sddefault.jpg',
-            'hqdefault.jpg'
-        ];
-
-        // 現在の品質のインデックスを取得
-        const currentQuality = qualities.findIndex(q => img.src.includes(q));
-        if (currentQuality < qualities.length - 1) {
-            // 次の品質を試す
-            img.src = `https://i.ytimg.com/vi/${videoId}/${qualities[currentQuality + 1]}`;
-        }
-    };
+    const title = escapeHtml(video.title);
     
     videoElement.innerHTML = `
-        <a href="${video.url}" target="_blank" rel="noopener">
-            <img src="${highQualityThumbnail}" 
-                 alt="${video.title}" 
+        <a href="${escapeHtml(video.url)}" target="_blank" rel="noopener">
+            <img src="${escapeHtml(highQualityThumbnail)}" 
+                 alt="${title}" 
                  loading="lazy" 
                  onload="this.style.opacity='1'"
-                 onerror="handleImageError(this)">
+                 onerror="this.onerror=null; handleImageError(this);">
         </a>
-        <h3 class="video-title">${video.title}</h3>
+        <h3 class="video-title">${title}</h3>
         <p class="video-description">${processedDescription}</p>
         <p class="video-date">投稿日: ${formatDate(video.publishedAt)}</p>
     `;
 
-    // エラーハンドラを設定
     const img = videoElement.querySelector('img');
     img.onerror = () => handleImageError(img);
     
@@ -132,16 +127,36 @@ function displayYouTubeVideo(video, container) {
 }
 
 function displayInstagramPost(post, container) {
+    if (!post || !container) return;
+
     const postElement = document.createElement('div');
     postElement.className = 'post fade-in';
+    
+    const caption = escapeHtml(post.caption || '');
+    
     postElement.innerHTML = `
-        <a href="${post.post_url}" target="_blank" rel="noopener">
-            <img src="${post.image_url}" alt="Instagram投稿" loading="lazy">
+        <a href="${escapeHtml(post.post_url)}" target="_blank" rel="noopener">
+            <img src="${escapeHtml(post.image_url)}" alt="Instagram投稿" loading="lazy">
         </a>
-        <p class="post-caption">${post.caption}</p>
+        <p class="post-caption">${caption}</p>
         <p class="post-date">投稿日: ${formatDate(post.timestamp)}</p>
     `;
     container.appendChild(postElement);
+}
+
+// データ取得の再試行を行う関数
+async function fetchWithRetry(url, retries = CONFIG.maxRetries) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return await response.json();
+    } catch (error) {
+        if (retries > 0) {
+            await new Promise(resolve => setTimeout(resolve, CONFIG.retryDelay));
+            return fetchWithRetry(url, retries - 1);
+        }
+        throw error;
+    }
 }
 
 // データ取得関数
@@ -150,16 +165,17 @@ async function fetchData(type, isInitialLoad = false) {
 
     state[type].loading = true;
     const container = document.getElementById(`${type}-${type === 'youtube' ? 'videos' : 'posts'}`);
+    if (!container) {
+        console.error(`Container for ${type} not found`);
+        return;
+    }
+
     const loadingElement = createLoadingElement();
     container.appendChild(loadingElement);
 
     try {
-        // データがまだ読み込まれていない場合のみ取得
         if (state[type].items.length === 0) {
-            const response = await fetch(`data/${type}.json`);
-            if (!response.ok) throw new Error(`${type}データの取得に失敗しました`);
-            const data = await response.json();
-            state[type].items = data;
+            state[type].items = await fetchWithRetry(`data/${type}.json`);
         }
         
         const itemsToLoad = isInitialLoad ? CONFIG.initialLoad : CONFIG.itemsPerPage;
@@ -188,7 +204,9 @@ async function fetchData(type, isInitialLoad = false) {
         errorElement.textContent = `${type}のデータ取得中にエラーが発生しました。`;
         container.appendChild(errorElement);
     } finally {
-        container.removeChild(loadingElement);
+        if (container.contains(loadingElement)) {
+            container.removeChild(loadingElement);
+        }
         state[type].loading = false;
     }
 }
