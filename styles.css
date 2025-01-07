@@ -70,11 +70,17 @@ h2 {
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
 }
 
-img {
+.video img, .post img {
     width: 100%;
-    height: auto;
+    height: 200px;
+    object-fit: cover;
     border-radius: 8px;
     margin-bottom: 1rem;
+    transition: transform 0.3s ease;
+}
+
+.video:hover img, .post:hover img {
+    transform: scale(1.05);
 }
 
 .video-title, .post-caption {
@@ -87,6 +93,17 @@ img {
 .video-date, .post-date {
     font-size: 0.9rem;
     color: #666;
+}
+
+.video-description {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--text-color);
+    margin: 0.5rem 0;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
 }
 
 @media (max-width: 768px) {
@@ -104,6 +121,15 @@ img {
 
     #youtube-videos, #instagram-posts {
         grid-template-columns: 1fr;
+    }
+
+    .video img, .post img {
+        height: 180px;
+    }
+    
+    .video-description {
+        font-size: 0.9rem;
+        -webkit-line-clamp: 2;
     }
 }
 
@@ -183,4 +209,14 @@ header {
         font-size: 1rem;
         line-height: 1.6;
     }
+}
+
+/* エラーメッセージのスタイル */
+.error-message {
+    color: #d32f2f;
+    text-align: center;
+    padding: 1rem;
+    margin: 1rem 0;
+    background-color: #ffebee;
+    border-radius: 8px;
 } 

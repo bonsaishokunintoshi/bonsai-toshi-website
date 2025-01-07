@@ -67,16 +67,24 @@ function processDescription(description) {
     return processedDesc.length > 100 ? processedDesc.substring(0, 100) + '...' : processedDesc;
 }
 
+function getHighQualityThumbnail(thumbnailUrl) {
+    // maxresdefault.jpg (1920x1080) を試す
+    const maxRes = thumbnailUrl.replace('hqdefault.jpg', 'maxresdefault.jpg');
+    return maxRes;
+}
+
 // コンテンツ表示関数
 function displayYouTubeVideo(video, container) {
     const videoElement = document.createElement('div');
     videoElement.className = 'video fade-in';
     
     const processedDescription = processDescription(video.description);
+    const highQualityThumbnail = getHighQualityThumbnail(video.thumbnail);
     
     videoElement.innerHTML = `
         <a href="${video.url}" target="_blank" rel="noopener">
-            <img src="${video.thumbnail}" alt="${video.title}" loading="lazy">
+            <img src="${highQualityThumbnail}" alt="${video.title}" loading="lazy"
+                 onerror="this.src='${video.thumbnail}'">
         </a>
         <h3 class="video-title">${video.title}</h3>
         <p class="video-description">${processedDescription}</p>
@@ -103,7 +111,7 @@ async function fetchData(type) {
     if (state[type].loading || !state[type].hasMore) return;
 
     state[type].loading = true;
-    const container = document.getElementById(`${type}-videos`);
+    const container = document.getElementById(`${type}-${type === 'youtube' ? 'videos' : 'posts'}`);
     const loadingElement = createLoadingElement();
     container.appendChild(loadingElement);
 
