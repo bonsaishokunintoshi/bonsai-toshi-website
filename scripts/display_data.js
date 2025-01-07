@@ -1,7 +1,7 @@
 // 設定
 const CONFIG = {
-    itemsPerPage: 6,
-    loadMoreThreshold: 100
+    itemsPerPage: 12,
+    loadMoreThreshold: 200
 };
 
 // 状態管理
@@ -68,9 +68,19 @@ function processDescription(description) {
 }
 
 function getHighQualityThumbnail(thumbnailUrl) {
-    // maxresdefault.jpg (1920x1080) を試す
-    const maxRes = thumbnailUrl.replace('hqdefault.jpg', 'maxresdefault.jpg');
-    return maxRes;
+    // 動画IDを抽出
+    const videoId = thumbnailUrl.match(/vi\/([^\/]+)/)?.[1];
+    if (!videoId) return thumbnailUrl;
+
+    // 高品質なサムネイルURLを構築
+    const qualities = [
+        'maxresdefault.jpg',  // 1920x1080
+        'sddefault.jpg',      // 640x480
+        'hqdefault.jpg'       // 480x360
+    ];
+
+    // 最高品質の画像URLを返す
+    return `https://i.ytimg.com/vi/${videoId}/${qualities[0]}`;
 }
 
 // コンテンツ表示関数
@@ -81,15 +91,42 @@ function displayYouTubeVideo(video, container) {
     const processedDescription = processDescription(video.description);
     const highQualityThumbnail = getHighQualityThumbnail(video.thumbnail);
     
+    // 画像読み込みエラー時の処理を改善
+    const handleImageError = (img) => {
+        const videoId = video.thumbnail.match(/vi\/([^\/]+)/)?.[1];
+        if (!videoId) return;
+
+        const qualities = [
+            'maxresdefault.jpg',
+            'sddefault.jpg',
+            'hqdefault.jpg'
+        ];
+
+        // 現在の品質のインデックスを取得
+        const currentQuality = qualities.findIndex(q => img.src.includes(q));
+        if (currentQuality < qualities.length - 1) {
+            // 次の品質を試す
+            img.src = `https://i.ytimg.com/vi/${videoId}/${qualities[currentQuality + 1]}`;
+        }
+    };
+    
     videoElement.innerHTML = `
         <a href="${video.url}" target="_blank" rel="noopener">
-            <img src="${highQualityThumbnail}" alt="${video.title}" loading="lazy"
-                 onerror="this.src='${video.thumbnail}'">
+            <img src="${highQualityThumbnail}" 
+                 alt="${video.title}" 
+                 loading="lazy" 
+                 onload="this.style.opacity='1'"
+                 onerror="handleImageError(this)">
         </a>
         <h3 class="video-title">${video.title}</h3>
         <p class="video-description">${processedDescription}</p>
         <p class="video-date">投稿日: ${formatDate(video.publishedAt)}</p>
     `;
+
+    // エラーハンドラを設定
+    const img = videoElement.querySelector('img');
+    img.onerror = () => handleImageError(img);
+    
     container.appendChild(videoElement);
 }
 
@@ -116,26 +153,32 @@ async function fetchData(type) {
     container.appendChild(loadingElement);
 
     try {
-        const response = await fetch(`data/${type}.json`);
-        if (!response.ok) throw new Error(`${type}データの取得に失敗しました`);
-        
-        const data = await response.json();
-        state[type].items = data;
+        // データがまだ読み込まれていない場合のみ取得
+        if (state[type].items.length === 0) {
+            const response = await fetch(`data/${type}.json`);
+            if (!response.ok) throw new Error(`${type}データの取得に失敗しました`);
+            const data = await response.json();
+            state[type].items = data;
+        }
         
         const start = state[type].page * CONFIG.itemsPerPage;
         const end = start + CONFIG.itemsPerPage;
         const items = state[type].items.slice(start, end);
         
-        items.forEach(item => {
-            if (type === 'youtube') {
-                displayYouTubeVideo(item, container);
-            } else {
-                displayInstagramPost(item, container);
-            }
-        });
+        if (items.length > 0) {
+            items.forEach(item => {
+                if (type === 'youtube') {
+                    displayYouTubeVideo(item, container);
+                } else {
+                    displayInstagramPost(item, container);
+                }
+            });
 
-        state[type].hasMore = end < state[type].items.length;
-        state[type].page++;
+            state[type].hasMore = end < state[type].items.length;
+            state[type].page++;
+        } else {
+            state[type].hasMore = false;
+        }
     } catch (error) {
         console.error(`Error fetching ${type} data:`, error);
         const errorElement = document.createElement('div');
@@ -148,14 +191,18 @@ async function fetchData(type) {
     }
 }
 
-// 無限スクロール
+// スクロールハンドラの改善
 function handleScroll() {
     const scrollPosition = window.innerHeight + window.scrollY;
     const documentHeight = document.documentElement.offsetHeight;
     
     if (documentHeight - scrollPosition < CONFIG.loadMoreThreshold) {
-        fetchData('youtube');
-        fetchData('instagram');
+        if (state.youtube.hasMore) {
+            fetchData('youtube');
+        }
+        if (state.instagram.hasMore) {
+            fetchData('instagram');
+        }
     }
 }
 
