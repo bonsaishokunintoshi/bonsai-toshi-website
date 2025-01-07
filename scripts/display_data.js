@@ -74,6 +74,10 @@ function escapeHtml(unsafe) {
 function processDescription(description) {
     if (!description) return '';
     
+    // キーワードの強調と構造化
+    const keywords = ['盆栽', '剪定', '育成', '技術', '伝統', '松', '植物'];
+    let processedDesc = description;
+    
     // 共通の前置きテキストを削除
     const commonPrefixes = [
         "チャンネル登録よろしくお願いします",
@@ -83,7 +87,6 @@ function processDescription(description) {
         "いつもご視聴ありがとうございます"
     ];
     
-    let processedDesc = description;
     commonPrefixes.forEach(prefix => {
         const index = processedDesc.toLowerCase().indexOf(prefix.toLowerCase());
         if (index !== -1) {
@@ -91,6 +94,16 @@ function processDescription(description) {
             if (nextLineBreak !== -1) {
                 processedDesc = processedDesc.substring(0, index) + processedDesc.substring(nextLineBreak + 1);
             }
+        }
+    });
+    
+    // キーワードの強調
+    keywords.forEach(keyword => {
+        if (processedDesc.toLowerCase().includes(keyword.toLowerCase())) {
+            processedDesc = processedDesc.replace(
+                new RegExp(`(${keyword})`, 'gi'),
+                '<span class="keyword" data-term="$1">$1</span>'
+            );
         }
     });
     
@@ -129,18 +142,35 @@ function displayYouTubeVideo(video, container) {
     const processedDescription = processDescription(video.description);
     const highQualityThumbnail = getHighQualityThumbnail(video.thumbnail);
     const title = escapeHtml(video.title);
+    const videoId = video.url.match(/(?:youtu\.be\/|youtube\.com(?:\/embed\/|\/v\/|\/watch\?v=|\/user\/\S+|\/ytscreeningroom\?v=|\/sandalsResorts#\w\/\w\/.*\/))([^\/&]{10,12})/)?.[1];
+    
+    // 構造化データの生成
+    const videoSchema = {
+        "@type": "VideoObject",
+        "name": title,
+        "description": processedDescription,
+        "thumbnailUrl": highQualityThumbnail,
+        "uploadDate": video.publishedAt,
+        "contentUrl": video.url,
+        "embedUrl": videoId ? `https://www.youtube.com/embed/${videoId}` : undefined
+    };
     
     videoElement.innerHTML = `
-        <a href="${escapeHtml(video.url)}" target="_blank" rel="noopener">
-            <img src="${escapeHtml(highQualityThumbnail)}" 
-                 alt="${title}" 
-                 loading="lazy" 
-                 onload="this.style.opacity='1'"
-                 onerror="this.onerror=null; handleImageError(this);">
-        </a>
-        <h3 class="video-title">${title}</h3>
-        <p class="video-description">${processedDescription}</p>
-        <p class="video-date">投稿日: ${formatDate(video.publishedAt)}</p>
+        <article itemscope itemtype="http://schema.org/VideoObject">
+            <meta itemprop="uploadDate" content="${video.publishedAt}">
+            <meta itemprop="thumbnailUrl" content="${escapeHtml(highQualityThumbnail)}">
+            <a href="${escapeHtml(video.url)}" target="_blank" rel="noopener">
+                <img src="${escapeHtml(highQualityThumbnail)}" 
+                     alt="${title}" 
+                     loading="lazy" 
+                     onload="this.style.opacity='1'"
+                     onerror="this.onerror=null; handleImageError(this);">
+            </a>
+            <h3 class="video-title" itemprop="name">${title}</h3>
+            <p class="video-description" itemprop="description">${processedDescription}</p>
+            <p class="video-date">投稿日: ${formatDate(video.publishedAt)}</p>
+            <script type="application/ld+json">${JSON.stringify(videoSchema)}</script>
+        </article>
     `;
 
     const img = videoElement.querySelector('img');

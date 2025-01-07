@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://bonsai-toshi.jp/sitemap.xml 
