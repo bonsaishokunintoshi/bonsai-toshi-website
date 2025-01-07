@@ -1,7 +1,8 @@
 // 設定
 const CONFIG = {
     itemsPerPage: 12,
-    loadMoreThreshold: 200
+    loadMoreThreshold: 200,
+    initialLoad: 24  // 初期表示数を増やす
 };
 
 // 状態管理
@@ -144,8 +145,8 @@ function displayInstagramPost(post, container) {
 }
 
 // データ取得関数
-async function fetchData(type) {
-    if (state[type].loading || !state[type].hasMore) return;
+async function fetchData(type, isInitialLoad = false) {
+    if (state[type].loading || (!isInitialLoad && !state[type].hasMore)) return;
 
     state[type].loading = true;
     const container = document.getElementById(`${type}-${type === 'youtube' ? 'videos' : 'posts'}`);
@@ -161,8 +162,9 @@ async function fetchData(type) {
             state[type].items = data;
         }
         
-        const start = state[type].page * CONFIG.itemsPerPage;
-        const end = start + CONFIG.itemsPerPage;
+        const itemsToLoad = isInitialLoad ? CONFIG.initialLoad : CONFIG.itemsPerPage;
+        const start = state[type].page * (isInitialLoad ? itemsToLoad : CONFIG.itemsPerPage);
+        const end = start + itemsToLoad;
         const items = state[type].items.slice(start, end);
         
         if (items.length > 0) {
@@ -208,8 +210,9 @@ function handleScroll() {
 
 // 初期化
 document.addEventListener('DOMContentLoaded', () => {
-    fetchData('youtube');
-    fetchData('instagram');
+    // 初期ロードでより多くのアイテムを表示
+    fetchData('youtube', true);
+    fetchData('instagram', true);
     window.addEventListener('scroll', handleScroll);
 });
 
