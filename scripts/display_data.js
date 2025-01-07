@@ -74,8 +74,6 @@ function escapeHtml(unsafe) {
 function processDescription(description) {
     if (!description) return '';
     
-    // キーワードの強調と構造化
-    const keywords = ['盆栽', '剪定', '育成', '技術', '伝統', '松', '植物'];
     let processedDesc = description;
     
     // 共通の前置きテキストを削除
@@ -97,22 +95,13 @@ function processDescription(description) {
         }
     });
     
-    // キーワードの強調
-    keywords.forEach(keyword => {
-        if (processedDesc.toLowerCase().includes(keyword.toLowerCase())) {
-            processedDesc = processedDesc.replace(
-                new RegExp(`(${keyword})`, 'gi'),
-                '<span class="keyword" data-term="$1">$1</span>'
-            );
-        }
-    });
-    
     processedDesc = processedDesc
         .split('\n')
         .filter(line => line.trim())
         .join('\n')
         .trim();
     
+    // 文字数制限とHTMLエスケープ
     return escapeHtml(processedDesc.length > 100 ? processedDesc.substring(0, 100) + '...' : processedDesc);
 }
 
