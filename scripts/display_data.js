@@ -31,11 +31,34 @@ function createLoadingElement() {
 }
 
 function formatDate(dateString) {
-    return new Date(dateString).toLocaleDateString('ja-JP', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
+    if (!dateString) return '';
+    
+    try {
+        // Unix timestampの場合（数値の場合）
+        if (typeof dateString === 'number') {
+            const date = new Date(dateString * 1000);
+            return date.toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+        
+        // 通常の日付文字列の場合
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) {
+            return '';  // 無効な日付の場合は空文字を返す
+        }
+        
+        return date.toLocaleDateString('ja-JP', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    } catch (error) {
+        console.error('Date formatting error:', error);
+        return '';
+    }
 }
 
 // セキュリティ対策: HTMLエスケープ関数
@@ -129,18 +152,27 @@ function displayYouTubeVideo(video, container) {
 function displayInstagramPost(post, container) {
     if (!post || !container) return;
 
+    // 画像URLが無効な場合はスキップ
+    if (!post.image_url) return;
+
     const postElement = document.createElement('div');
     postElement.className = 'post fade-in';
     
     const caption = escapeHtml(post.caption || '');
+    const dateStr = formatDate(post.timestamp) || '';
+    const dateDisplay = dateStr ? `<p class="post-date">投稿日: ${dateStr}</p>` : '';
     
     postElement.innerHTML = `
         <a href="${escapeHtml(post.post_url)}" target="_blank" rel="noopener">
-            <img src="${escapeHtml(post.image_url)}" alt="Instagram投稿" loading="lazy">
+            <img src="${escapeHtml(post.image_url)}" 
+                 alt="Instagram投稿" 
+                 loading="lazy"
+                 onerror="this.closest('.post').remove()">
         </a>
         <p class="post-caption">${caption}</p>
-        <p class="post-date">投稿日: ${formatDate(post.timestamp)}</p>
+        ${dateDisplay}
     `;
+
     container.appendChild(postElement);
 }
 
