@@ -110,15 +110,18 @@ function getHighQualityThumbnail(thumbnailUrl) {
     const videoId = thumbnailUrl.match(/vi\/([^\/]+)/)?.[1];
     if (!videoId) return thumbnailUrl;
 
-    // 高品質なサムネイルURLを構築
-    const qualities = [
-        'maxresdefault.jpg',  // 1920x1080
-        'sddefault.jpg',      // 640x480
-        'hqdefault.jpg'       // 480x360
-    ];
+    // 高品質なサムネイルURLを構築（フォールバック付き）
+    return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+}
 
-    // 最高品質の画像URLを返す
-    return `https://i.ytimg.com/vi/${videoId}/${qualities[0]}`;
+function handleImageError(img) {
+    // YouTubeサムネイルの場合、低画質版にフォールバック
+    if (img.src.includes('maxresdefault.jpg')) {
+        img.src = img.src.replace('maxresdefault.jpg', 'hqdefault.jpg');
+        return;
+    }
+    // Instagram画像の場合、プレースホルダー画像を表示
+    img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24"><path fill="%23999" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>';
 }
 
 // コンテンツ表示関数
@@ -183,7 +186,8 @@ function displayInstagramPost(post, container) {
             <img src="${escapeHtml(post.media_url)}" 
                  alt="Instagram投稿" 
                  loading="lazy"
-                 onload="this.style.opacity='1'">
+                 onload="this.style.opacity='1'"
+                 onerror="handleImageError(this)">
         </a>
         <p class="post-caption">${caption}</p>
         ${dateDisplay}
