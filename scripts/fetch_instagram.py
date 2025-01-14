@@ -67,4 +67,4 @@ def fetch_instagram_posts():
             json.dump([], f)
 
 if __name__ == "__main__":
-    fetch_instagram_posts() 
+    fetch_instagram_posts()
