@@ -171,9 +171,6 @@ function displayYouTubeVideo(video, container) {
 function displayInstagramPost(post, container) {
     if (!post || !container) return;
 
-    // 画像URLが無効な場合はスキップ
-    if (!post.image_url) return;
-
     const postElement = document.createElement('div');
     postElement.className = 'post fade-in';
     
@@ -183,10 +180,10 @@ function displayInstagramPost(post, container) {
     
     postElement.innerHTML = `
         <a href="${escapeHtml(post.post_url)}" target="_blank" rel="noopener">
-            <img src="${escapeHtml(post.image_url)}" 
+            <img src="${escapeHtml(post.media_url)}" 
                  alt="Instagram投稿" 
                  loading="lazy"
-                 onerror="this.closest('.post').remove()">
+                 onload="this.style.opacity='1'">
         </a>
         <p class="post-caption">${caption}</p>
         ${dateDisplay}
