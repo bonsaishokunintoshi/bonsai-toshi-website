@@ -1,43 +1,46 @@
-name: Update Data Weekly
+name: Update Data
 
 on:
   schedule:
     - cron: '0 0 * * 0'  # 毎週日曜日の午前0時に実行
-  workflow_dispatch:      # 手動実行も可能
+  workflow_dispatch:  # 手動実行用
 
 jobs:
-  update-data:
+  update_data:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
-        fetch-depth: 0
-
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
-
+        
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests instaloader
-
-    - name: Create data directory
-      run: mkdir -p data
-
-    - name: Fetch YouTube data
+        pip install -r scripts/requirements.txt
+        
+    - name: Run update scripts
+      run: |
+        python scripts/fetch_youtube.py
+        python scripts/fetch_instagram.py
       env:
         YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-      run: python scripts/fetch_youtube.py
-
-    - name: Fetch Instagram data
-      run: python scripts/fetch_instagram.py
-
-    - name: Commit and push if changes
+        
+    - name: Configure Git
       run: |
-        git config --local user.email "actions@github.com"
-        git config --local user.name "GitHub Actions"
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        
+    - name: Commit and push if changed
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
         git add data/*.json
-        git diff --quiet && git diff --staged --quiet || (git commit -m "Update data $(date +'%Y-%m-%d')" && git push) 
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Update data $(date +'%Y-%m-%d')" && git push origin HEAD:main) 
